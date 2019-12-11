@@ -1,5 +1,6 @@
 extends Area2D
 
+var enabled_highlight_animation = false
 var enabled_highlight = true
 var enabled_pickup = true
 var picked_up = false
@@ -26,18 +27,16 @@ func highlight_required_offset_set(value):
 	highlight_required_offset = value
 	self.add_required_animation_offset(self.highlight_required_offset)
 
-func update_animation():
-	set_required_animation_offset(self.required_animation_offset)
-
-func set_required_animation_offset(value, time_reset=true):
+func set_required_animation_offset(offset, time_reset=true):
 	if time_reset:
 		self.curr_animation_time = 0
 	
-	self.required_animation_offset = value
+	self.required_animation_offset = offset
 	
 	self.animation_start_point = self.transform.origin
 	self.animation_end_point = self.pos + self.required_animation_offset
-
+	print(self.transform.origin, self.pos)
+	
 	var animation_vector = self.animation_end_point - self.animation_start_point
 	
 	if self.curr_animation_time == self.animation_time:
@@ -47,22 +46,36 @@ func set_required_animation_offset(value, time_reset=true):
 	var time = self.animation_time - self.curr_animation_time
 	self.animation_speed = 2 * animation_vector / time
 	self.animation_velocity = -self.animation_speed / time
-	print(self.id, " ", self.animation_start_point, " ", self.animation_end_point)
 
 func add_required_animation_offset(offset, time_reset=true):
 	if time_reset:
 		self.curr_animation_time = 0
 	self.set_required_animation_offset(self.required_animation_offset + offset)
 
+func update_animation():
+	set_required_animation_offset(self.required_animation_offset)
+
+func reset_animation():  # makes transform.origin the current position
+	self.animation_offset = Vector2(0, 0)
+	self.highlight_required_offset = Vector2(0, 0)
+	self.set_required_animation_offset(Vector2(0, 0))
+	#print(self.transform.origin, " ", self.pos)
+	
+
 var pos : Vector2 setget pos_set, pos_get
 
 func pos_set(value):
 	pos = value
 	self.update_animation()
-	#print(self.transform.origin, " ", value, " ", self.animation_offset)
 
 func pos_get():
 	return pos
+
+func set_pos(new_pos, animation=true):
+	pos = new_pos
+	if not animation:
+		self.transform.origin = new_pos
+		self.reset_animation()
 
 signal card_created(path)
 signal pickup_request(path, event)
@@ -121,10 +134,15 @@ func point_belongs_to_card(point : Vector2):
 
 func move_card(mouse_motion : InputEventMouseMotion):
 	var screen_size = self.get_viewport().size
-	self.transform[2].x = clamp(self.transform[2].x + mouse_motion.relative.x,
+	var x = clamp(self.pos.x + mouse_motion.relative.x,
 			self.get_size()[0] / 2, screen_size.x - self.get_size()[0] / 2)
-	self.transform[2].y = clamp(self.transform[2].y + mouse_motion.relative.y,
+	var y = clamp(self.pos.y + mouse_motion.relative.y,
 			self.get_size()[1] / 2, screen_size.y - self.get_size()[1] / 2)
+	self.set_pos(Vector2(x, y), false)
+#	self.transform.origin.x = clamp(self.transform.origin.x + mouse_motion.relative.x,
+#			self.get_size()[0] / 2, screen_size.x - self.get_size()[0] / 2)
+#	self.transform.origin.y = clamp(self.transform.origin.y + mouse_motion.relative.y,
+#			self.get_size()[1] / 2, screen_size.y - self.get_size()[1] / 2)
 
 func get_size():
 	return Vector2($BackSprite.texture.get_width() * $BackSprite.get_scale()[0],
@@ -152,59 +170,10 @@ func highlight_control():
 		$BordersSprite.show()
 		emit_signal("highlighted", self.get_path())
 	else:
+		print("huh")
 		self.highlight_required_offset = Vector2(0, 0)
 		$BordersSprite.hide()
 		emit_signal("not_highlighted", self.get_path())
-
-#var highlight_animation_offset : Vector2 = Vector2(0, 0)
-#var required_highlight_animation_offset : Vector2
-#
-#var highlight_animation_time : float
-#var curr_highlight_animation_time = 0.0
-#var curr_required_animation_time : float
-#var highlight_animation_speed : float
-#var highlight_animation_velocity : float
-
-#func set_highlight_animation_time(time : float):
-#	self.highlight_animation_time = time
-#	self.highlight_animation_speed = 2 * self.required_highlight_animation_offset[1] / self.highlight_animation_time
-#	self.highlight_animation_velocity = -self.highlight_animation_speed / self.highlight_animation_time
-#
-#func set_curr_highlight_animation_time():
-#	if self.highlighted:
-#		self.curr_highlight_animation_time = (-self.highlight_animation_speed - sqrt(pow(self.highlight_animation_speed, 2) \
-#				 + 2 * self.highlight_animation_velocity * self.highlight_animation_offset[1])) / self.highlight_animation_velocity
-#	else:
-#		self.curr_highlight_animation_time = sqrt(abs(self.highlight_animation_offset[1] * 2 / self.highlight_animation_velocity))
-#
-#func highlight_animation(delta):
-#	self.transform.origin.x -= self.highlight_animation_offset.length() * sin(self.transform.get_rotation())
-#	self.transform.origin.y -= -self.highlight_animation_offset.length() * cos(self.transform.get_rotation())
-#
-#	if self.highlighted:
-#		self.curr_highlight_animation_time = clamp(curr_highlight_animation_time + delta, 0, self.highlight_animation_time)
-#		var time = self.curr_highlight_animation_time
-#		self.highlight_animation_offset[1] = time * (highlight_animation_speed + highlight_animation_velocity * time / 2)
-#	else:
-#		self.curr_highlight_animation_time = clamp(curr_highlight_animation_time - delta, 0, self.highlight_animation_time)
-#		var time = self.curr_highlight_animation_time
-#		self.highlight_animation_offset[1] = -highlight_animation_velocity * pow(time, 2) / 2
-#	#self.highlight_animation_offset[1] = clamp(self.animation_offset[1], self.required_highlight_animation_offset[1], 0)
-#
-#	self.transform.origin.x += self.highlight_animation_offset.length() * sin(self.transform.get_rotation())
-#	self.transform.origin.y += -self.highlight_animation_offset.length() * cos(self.transform.get_rotation())
-#
-#var hand_animation_offset : Vector2
-#
-#var hand_animation_time : float
-#var curr_hand_animation_time : float
-#
-#func set_hand_animation(time : float, animation_offset : Vector2):
-#	self.hand_animation_time = time
-#	self.hand_animation_offset = animation_offset
-#
-#func hand_animation(delta):
-#	pass
 
 func _process(delta):
 	self.transform.origin = self.animation_start_point - self.animation_offset
