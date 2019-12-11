@@ -1,0 +1,97 @@
+[gd_scene load_steps=7 format=2]
+
+[ext_resource path="res://card_textures/sharp_vision.png" type="Texture" id=1]
+[ext_resource path="res://Test.gd" type="Script" id=2]
+
+[sub_resource type="Shader" id=1]
+code = "shader_type canvas_item;
+
+uniform int fps = 60;
+uniform int random_shining_start_frame = 0;
+uniform float frequency = 5.0;
+uniform float lifetime = 10.0;
+uniform float dissapear_time = 1.0;
+
+void fragment(){
+	COLOR = texture(TEXTURE, UV);
+	
+	// code for \"shining\"
+	int frames = int(frequency * float(fps));
+	float time = float(int(float(int(TIME  * float(frames) / frequency)) + float(random_shining_start_frame) * frequency) % frames);
+	
+	if (time < float(frames) / 2.0){
+		COLOR.rgb += time / float(frames);
+	}
+	else {
+		COLOR.rgb += (float(frames) - time) / float(frames);
+	}
+	vec2 texture_size = pow(TEXTURE_PIXEL_SIZE, vec2(-1.0));
+	vec2 texture_center = 0.5 * texture_size;
+	
+	
+	// code for gradual dissapearment when lifetime is ending
+	int lifetime_frames = int(float(fps) * lifetime);
+	float lifetime_timer = float((int(TIME * float(lifetime_frames) / lifetime)) % lifetime_frames);
+	
+	int dissapear_frames = int(float(fps) * dissapear_time);
+	if (lifetime_timer > float(lifetime_frames - dissapear_frames)) {
+		lifetime_timer -= float(lifetime_frames - dissapear_frames);
+		
+		float length_bit = length(texture_size / 2.0) / float(dissapear_frames);
+		float current_max_radius_length = length_bit * (float(dissapear_frames) - lifetime_timer);
+		
+		vec2 vector_radius = vec2(UV.x * texture_size[0] - texture_center[0], UV.y * texture_size[1] - texture_center[1]);
+		float dif_between_vec_rad_cur_rad = length(vector_radius) - current_max_radius_length;
+		COLOR.a = clamp(1.0 - length(vector_radius) / current_max_radius_length, 0.0, 1.0);
+//		if (dif_between_vec_rad_cur_rad > 0.0) {
+//			COLOR.a = 0.0;
+//		}
+	}
+}
+
+void vertex() {
+	//VERTEX += vec2(100, 100);
+}"
+
+[sub_resource type="ShaderMaterial" id=2]
+shader = SubResource( 1 )
+shader_param/fps = 60
+shader_param/random_shining_start_frame = 0
+shader_param/frequency = 5.0
+shader_param/lifetime = 10.0
+shader_param/dissapear_time = 1.0
+
+[sub_resource type="Shader" id=3]
+code = "shader_type canvas_item;
+
+uniform sampler2D test;
+
+void fragment() {
+	COLOR = texture(test, UV);
+}
+
+void vertex() {
+	if (UV.x > 0.5) {
+		VERTEX.x += (UV.x) * float(textureSize(test, 0).x);
+	}
+	if (UV.y > 0.5) {
+		VERTEX.y += float(textureSize(test, 0).y) * UV.y;
+	}
+	int curr_frame = int(TIME * 100.0) % 100;
+	bool second_passed = curr_frame % 10 == 0;
+	if (second_passed) {
+		VERTEX += float(curr_frame);
+	}
+}"
+
+[sub_resource type="ShaderMaterial" id=4]
+shader = SubResource( 3 )
+shader_param/test = ExtResource( 1 )
+
+[node name="Sprite" type="Sprite"]
+material = SubResource( 2 )
+texture = ExtResource( 1 )
+script = ExtResource( 2 )
+
+[node name="Particles2D" type="Particles2D" parent="."]
+material = SubResource( 4 )
