@@ -21,7 +21,7 @@ func _ready():
 
 	self.set_mouse_filter(MOUSE_FILTER_IGNORE)  # important stuff, lets cards in the deck get mouse events
 	
-	for i in range(3):
+	for i in range(60):
 		self.receive_card(SharpVision.instance())
 	
 	self.set_view()
@@ -33,7 +33,9 @@ func receive_card(card):
 	
 	self.add_child(card)
 	cards_arr.append(card)
-	card.z_index = len(cards_arr)
+	
+	card.z_index += len(cards_arr)  # temp
+	card.enabled_highlight_animation = true
 	
 	self.set_view()
 
@@ -42,6 +44,10 @@ func remove_card(card):
 		print("There is no such card in hand")
 		return
 	self.cards_arr.erase(card)
+	
+	card.z_index = 1  # temp
+	card.enabled_highlight_animation = false
+	
 	self.set_view()
 
 func set_view():
@@ -65,6 +71,7 @@ func set_view():
 		current_card.transform[0] = Vector2(1, 0)
 		current_card.transform[1] = Vector2(0, 1)
 		current_card.pos = current_card_position
+		current_card.set_required_angle_offset(0)
 	
 	# code for cards that are in the left half
 	card_top_left = (self.rect_size - current_card.get_size()) / 2
@@ -74,15 +81,17 @@ func set_view():
 	for i in range(len(cards_arr) / 2 - 1, -1, -1):
 		current_card = cards_arr[i]
 		
-		current_card.transform[0] = Vector2(1, 0).rotated(deg2rad(current_angle))
-		current_card.transform[1] = Vector2(0, 1).rotated(deg2rad(current_angle))
+		#print(current_card.id, " ", current_angle)
+		current_card.set_required_angle_offset(deg2rad(current_angle))
+		#current_card.transform = current_card.transform.rotated(deg2rad(-current_angle))
 		
-		card_top_right = current_card.to_global(Vector2(current_card.get_size()[0] / 2, current_card.get_size()[1] / -2))
+		card_top_right = current_card.pos + Vector2(current_card.get_size()[0] / 2,
+				 current_card.get_size()[1] / -2).rotated(current_card.transform.get_rotation())
 		var difference = card_top_left - card_top_right
 		current_card.pos += difference
 		current_card.pos += Vector2(5, 5)  # to make hand look less like a fan and more like a hand
 		
-		card_top_left = current_card.to_global(current_card.get_size() / -2)
+		card_top_left = current_card.pos + current_card.get_size().rotated(current_card.transform.get_rotation()) / -2
 		
 		current_angle -= angle_between_cards
 	
@@ -95,14 +104,15 @@ func set_view():
 	for i in range(len(cards_arr) / 2 + len(cards_arr) % 2, len(cards_arr)):
 		current_card = cards_arr[i]
 		
-		current_card.transform[0] = Vector2(1, 0).rotated(deg2rad(current_angle))
-		current_card.transform[1] = Vector2(0, 1).rotated(deg2rad(current_angle))
+		current_card.set_required_angle_offset(deg2rad(current_angle))
+		#current_card.transform = current_card.transform.rotated(deg2rad(current_angle))
 		
-		card_top_left = current_card.to_global(current_card.get_size() / -2)
+		card_top_left = current_card.pos + current_card.get_size().rotated(current_card.transform.get_rotation()) / -2
 		var difference = card_top_right - card_top_left
 		current_card.pos += difference
 		current_card.pos += Vector2(-5, 5)  # to make hand look less like a fan and more like a hand
-		card_top_right = current_card.to_global(Vector2(current_card.get_size()[0] / 2, current_card.get_size()[1] / -2))
+		card_top_right = current_card.pos + Vector2(current_card.get_size()[0] / 2,
+				 current_card.get_size()[1] / -2).rotated(current_card.transform.get_rotation())
 		
 		current_angle += angle_between_cards
 
