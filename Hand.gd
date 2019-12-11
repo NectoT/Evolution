@@ -21,20 +21,32 @@ func _ready():
 
 	self.set_mouse_filter(MOUSE_FILTER_IGNORE)  # important stuff, lets cards in the deck get mouse events
 	
-	for i in range(60):
-		self.receive_card(SharpVision.instance())
+	for i in range(5):
+		self.receive_card(SharpVision.instance(), true)
 	
 	self.set_view()
 
-func receive_card(card):
+func receive_card(card, append=false):
 	if len(cards_arr) == 0: 
 		self.hand_radius = sqrt(pow(self.rect_size[0], 2) + pow(self.rect_size[1], 2)) / 2
 		print(self.hand_radius)
 	
 	self.add_child(card)
-	cards_arr.append(card)
 	
-	card.z_index += len(cards_arr)  # temp
+	if append:
+		cards_arr.append(card)
+		card.z_index += len(cards_arr) - 1  # temp
+	else:
+		for i in range(len(cards_arr)):
+			var hand_card = cards_arr[i]
+			if card.pos.x < hand_card.pos.x:
+				cards_arr.insert(i, card)
+				card.z_index += i
+				break
+		if !(card in cards_arr):
+			cards_arr.append(card)
+			card.z_index += len(cards_arr) - 1  # temp
+	
 	card.enabled_highlight_animation = true
 	
 	self.set_view()
@@ -81,9 +93,7 @@ func set_view():
 	for i in range(len(cards_arr) / 2 - 1, -1, -1):
 		current_card = cards_arr[i]
 		
-		#print(current_card.id, " ", current_angle)
 		current_card.set_required_angle_offset(deg2rad(current_angle))
-		#current_card.transform = current_card.transform.rotated(deg2rad(-current_angle))
 		
 		card_top_right = current_card.pos + Vector2(current_card.get_size()[0] / 2,
 				 current_card.get_size()[1] / -2).rotated(current_card.transform.get_rotation())
@@ -105,7 +115,6 @@ func set_view():
 		current_card = cards_arr[i]
 		
 		current_card.set_required_angle_offset(deg2rad(current_angle))
-		#current_card.transform = current_card.transform.rotated(deg2rad(current_angle))
 		
 		card_top_left = current_card.pos + current_card.get_size().rotated(current_card.transform.get_rotation()) / -2
 		var difference = card_top_right - card_top_left
