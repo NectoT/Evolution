@@ -2,11 +2,17 @@ extends Node
 
 var SharpVision = preload("res://Cards/SharpVision.tscn")
 
+var timer = Timer.new()
+
+var floating_cards_arr = []
+var picked_card = null
+
 signal card_highlight_off
 signal card_highlight_on
 
 func _ready():
-	pass # Replace with function body.
+	self.add_child(self.timer)
+	self.timer.one_shot = true
 
 # temp
 func _input(event):
@@ -42,11 +48,8 @@ func _on_card_not_highlighted(path):
 		if card != highlighted_card:
 			card.enabled_highlight = true
 
-
 func _on_pickup_request(path, event):
-	
 	var card = self.get_node(path)
-	#self.remove_child(card)
 	
 	# handler for card in the Hand
 	if card.get_parent() == $Container:
@@ -57,20 +60,72 @@ func _on_pickup_request(path, event):
 				if overlapping_card.z_index > card.z_index:
 					card.picked_up = false
 					return
+		# if it's not than it can be picked up
+		card.picked_up = true
+		# we need to track down which card is picked up
+		self.picked_card = self.get_node(path)
 		
 		# removing card from the hand
 		$Container.remove_card(card)
 		
 		# setting the card straight i.e. returning it's basis to a normal one
-		card.transform.x = Vector2(1, 0)
-		card.transform.y = Vector2(0, 1)
+		card.set_required_angle_offset(0)
+		
+		# the card is temporarily stored in main, until it gets put down
+		self.add_child(card)
+		self.floating_cards_arr.append(card)  # temp i suppose
+		
+		return
+	
+	# temp default handler
+	self.picked_card = self.get_node(path)
+	
 	
 	# disabling highlight while a card is picked
 	for hand_card in $Container.cards_arr:
 		hand_card.enabled_highlight = false
 
 func _on_put_down_request(path, event):
+	self.picked_card = null
+	var card = self.get_node(path)
+	
+	# checking if the card is in the hand container bounds and putting it there in case it is
+	var container_pos = $Container.rect_global_position
+	if card.pos.x > container_pos[0] and card.pos.x < container_pos[0] + $Container.rect_size[0] \
+			and card.pos.y > container_pos[1] and card.pos.y < container_pos[1] + $Container.rect_size[1]:
+		self.remove_child(card)
+		$Container.receive_card(card)
+	
 	
 	# enabling highlight when the card is put down
 	for hand_card in $Container.cards_arr:
 			hand_card.enabled_highlight = true
+
+func inform_hand_about_potential_card():
+	if self.picked_card == null:  # the card might have been already placed
+		return
+	
+	print("inform")
+	var container_pos = $Container.rect_global_position
+	if self.picked_card.pos.x > container_pos[0] and self.picked_card.pos.x < container_pos[0] + $Container.rect_size[0] \
+			and self.picked_card.pos.y > container_pos[1] and self.picked_card.pos.y < container_pos[1] + $Container.rect_size[1]:
+		$Container.add_potential_card(self.picked_card)
+	
+	self.timer.paused = true  # pausing the timer so that there wouldn't be excessive calls to the player's hand
+
+func _process(delta):
+	var container_pos = $Container.rect_global_position
+	if self.picked_card != null:
+		# checking if the card is in the hand container bounds and starting timer, after which picked card will be viewed as
+		# potential card for hand
+		if picked_card.pos.x > container_pos[0] and picked_card.pos.x < container_pos[0] + $Container.rect_size[0] \
+				and picked_card.pos.y > container_pos[1] and picked_card.pos.y < container_pos[1] + $Container.rect_size[1]:
+			if timer.is_stopped():
+				timer.wait_time = 1
+				timer.start()
+				timer.connect("timeout", self, "inform_hand_about_potential_card")
+	elif self.timer.paused:
+		self.timer.paused = false
+		self.timer.stop()
+		self.timer.disconnect("timeout", self, "inform_hand_about_potential_card")
+		$Container.remove_potential_card()

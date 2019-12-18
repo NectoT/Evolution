@@ -1,10 +1,14 @@
 extends Container
 
-var Card = preload("res://Cards/Scripts/Card.gd")
+var Card = preload("res://Cards/Card.tscn")
 var SharpVision = preload("res://Cards/SharpVision.tscn")
 
 var cards_arr = []
-var hand_radius
+var fake_card = Card.instance()
+var potential_card = null
+
+export var maximum_tilt : int = 15
+export var default_angle_between_cards : int = 6
 
 export var highlight_animation_time : float = 2
 
@@ -16,6 +20,9 @@ func _notification(what):
             	fit_child_in_rect( c, Rect2( Vector2(), self.get_size() ) )
 
 func _ready():
+	self.fake_card.visible = false  # so that you couldn't see it and interact with it
+	self.add_child(self.fake_card)
+	
 	var card = SharpVision.instance()
 	#card.flip_card()
 
@@ -27,9 +34,8 @@ func _ready():
 	self.set_view()
 
 func receive_card(card, append=false):
-	if len(cards_arr) == 0: 
-		self.hand_radius = sqrt(pow(self.rect_size[0], 2) + pow(self.rect_size[1], 2)) / 2
-		print(self.hand_radius)
+	self.remove_fake_card()
+	self.potential_card = null
 	
 	self.add_child(card)
 	
@@ -51,6 +57,12 @@ func receive_card(card, append=false):
 	
 	self.set_view()
 
+# same thing as receive_card except instead of the card it inserts invisible card
+func receive_fake_card(index):  # used for showing where the potential card will be placed
+	self.remove_fake_card()
+	cards_arr.insert(index, self.fake_card)
+	self.set_view()
+
 func remove_card(card):
 	if self.cards_arr.find(card) == -1:
 		print("There is no such card in hand")
@@ -60,17 +72,29 @@ func remove_card(card):
 	card.z_index = 1  # temp
 	card.enabled_highlight_animation = false
 	
+	self.remove_child(card)
+	
 	self.set_view()
+
+func remove_fake_card():
+	self.cards_arr.erase(self.fake_card)
+
+func add_potential_card(card):
+	self.potential_card = card
+
+func remove_potential_card():
+	self.potential_card = null
 
 func set_view():
 	if len(cards_arr) == 0:
 		return
 	
-	var maximum_tilt = 20
-	var angle_between_cards = 6
 	var current_angle
-	if len(cards_arr) / 2 * angle_between_cards > maximum_tilt:
-		angle_between_cards = maximum_tilt / (len(cards_arr) / 2)
+	var angle_between_cards
+	if len(cards_arr) / 2 * self.default_angle_between_cards > maximum_tilt:
+		angle_between_cards = self.maximum_tilt / (len(cards_arr) / 2)
+	else:
+		angle_between_cards = self.default_angle_between_cards
 	
 	var current_card = cards_arr[0]
 	var card_top_right
@@ -98,6 +122,7 @@ func set_view():
 		card_top_right = current_card.pos + Vector2(current_card.get_size()[0] / 2,
 				 current_card.get_size()[1] / -2).rotated(current_card.transform.get_rotation())
 		var difference = card_top_left - card_top_right
+		
 		current_card.pos += difference
 		current_card.pos += Vector2(5, 5)  # to make hand look less like a fan and more like a hand
 		
@@ -118,15 +143,41 @@ func set_view():
 		
 		card_top_left = current_card.pos + current_card.get_size().rotated(current_card.transform.get_rotation()) / -2
 		var difference = card_top_right - card_top_left
+		
 		current_card.pos += difference
 		current_card.pos += Vector2(-5, 5)  # to make hand look less like a fan and more like a hand
+		
 		card_top_right = current_card.pos + Vector2(current_card.get_size()[0] / 2,
 				 current_card.get_size()[1] / -2).rotated(current_card.transform.get_rotation())
 		
 		current_angle += angle_between_cards
 
-#func _input(event):
-#	print(3, "\n")
-
-#func _gui_input(event):
-#	pass
+func _process(delta):
+	if self.potential_card != null:
+		# worls only if card has normal proportions, where width is less than height
+		var min_card_width = self.fake_card.get_size()[0]
+		var max_card_width = self.fake_card.get_size()[1]
+		
+		var index_error = ceil(float(max_card_width) / min_card_width)
+		
+		var difference_between_potential_and_middle_cards =  self.potential_card.pos[0] - self.rect_size[0] / 2
+		var index_distance = ceil(difference_between_potential_and_middle_cards / min_card_width)
+		
+		var start
+		var end
+		var step
+		if index_distance > 0:
+			start = clamp(len(self.cards_arr) / 2 + index_distance, -len(self.cards_arr) + 1, len(self.cards_arr) - 1)
+			end = start - index_error
+			step = -1
+		else:
+			start = clamp(len(self.cards_arr) / 2 + index_distance, -len(self.cards_arr) + 1, len(self.cards_arr) - 1)
+			end = start + index_error
+			step = 1
+		for i in range(start, end, step):
+			var hand_card = self.cards_arr[i]
+			if self.potential_card.pos.x < hand_card.pos.x:
+				if cards_arr.find(self.fake_card) != i:
+					self.receive_fake_card(i)
+				break
+	
