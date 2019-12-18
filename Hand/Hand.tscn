@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=2]
 
-[ext_resource path="res://Hand.gd" type="Script" id=1]
+[ext_resource path="res://Hand/Scripts/Hand.gd" type="Script" id=1]
 
 [node name="Container" type="Container"]
 margin_right = 800.0
@@ -11,4 +11,4 @@ script = ExtResource( 1 )
 margin_right = 40.0
 margin_bottom = 40.0
 mouse_filter = 2
-color = Color( 0.164706, 0.321569, 0.619608, 1 )
+color = Color( 0.164706, 0.619608, 0.247059, 1 )

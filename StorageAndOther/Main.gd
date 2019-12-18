@@ -17,7 +17,7 @@ func _ready():
 # temp
 func _input(event):
 	if event is InputEventKey and event.get_scancode() == KEY_N and not event.is_echo() and event.is_pressed():
-		$Container.receive_card(SharpVision.instance())
+		$PlayersHand.receive_card(SharpVision.instance())
 
 func _on_card_created(path):
 	var card = self.get_node(path)
@@ -35,24 +35,24 @@ func point_belongs_to_card(card, point : Vector2):
 func _on_card_highlighted(path):  
 	var highlighted_card = self.get_node(path)
 
-	# disabling higlight for all the other cards in hand while the highlighted_card is highlighted
-	for card in $Container.cards_arr:
+	# disabling higlight for all the other cards in player's hand while the highlighted_card is highlighted
+	for card in $PlayersHand.cards_arr:
 		if card != highlighted_card:
 			card.enabled_highlight = false
 
 func _on_card_not_highlighted(path):
 	var highlighted_card = self.get_node(path)
 
-	# enabling higlight for all the other cards in hand when the highlighted_card is not highlighted anymore
-	for card in $Container.cards_arr: 
+	# enabling higlight for all the other cards in player's hand when the highlighted_card is not highlighted anymore
+	for card in $PlayersHand.cards_arr: 
 		if card != highlighted_card:
 			card.enabled_highlight = true
 
 func _on_pickup_request(path, event):
 	var card = self.get_node(path)
 	
-	# handler for card in the Hand
-	if card.get_parent() == $Container:
+	# handler for card in the PlayersHand
+	if card.get_parent() == $PlayersHand:
 		# checking if this card isn't obstructed by other cards
 		var overlapping_cards = card.get_overlapping_areas()
 		for overlapping_card in overlapping_cards:
@@ -66,7 +66,7 @@ func _on_pickup_request(path, event):
 		self.picked_card = self.get_node(path)
 		
 		# removing card from the hand
-		$Container.remove_card(card)
+		$PlayersHand.remove_card(card)
 		
 		# setting the card straight i.e. returning it's basis to a normal one
 		card.set_required_angle_offset(0)
@@ -82,23 +82,23 @@ func _on_pickup_request(path, event):
 	
 	
 	# disabling highlight while a card is picked
-	for hand_card in $Container.cards_arr:
+	for hand_card in $PlayersHand.cards_arr:
 		hand_card.enabled_highlight = false
 
 func _on_put_down_request(path, event):
 	self.picked_card = null
 	var card = self.get_node(path)
 	
-	# checking if the card is in the hand container bounds and putting it there in case it is
-	var container_pos = $Container.rect_global_position
-	if card.pos.x > container_pos[0] and card.pos.x < container_pos[0] + $Container.rect_size[0] \
-			and card.pos.y > container_pos[1] and card.pos.y < container_pos[1] + $Container.rect_size[1]:
+	# checking if the card is in the player's hand container bounds and putting it there in case it is
+	var container_pos = $PlayersHand.rect_global_position
+	if card.pos.x > container_pos[0] and card.pos.x < container_pos[0] + $PlayersHand.rect_size[0] \
+			and card.pos.y > container_pos[1] and card.pos.y < container_pos[1] + $PlayersHand.rect_size[1]:
 		self.remove_child(card)
-		$Container.receive_card(card)
+		$PlayersHand.receive_card(card)
 	
 	
 	# enabling highlight when the card is put down
-	for hand_card in $Container.cards_arr:
+	for hand_card in $PlayersHand.cards_arr:
 			hand_card.enabled_highlight = true
 
 func inform_hand_about_potential_card():
@@ -106,20 +106,20 @@ func inform_hand_about_potential_card():
 		return
 	
 	print("inform")
-	var container_pos = $Container.rect_global_position
-	if self.picked_card.pos.x > container_pos[0] and self.picked_card.pos.x < container_pos[0] + $Container.rect_size[0] \
-			and self.picked_card.pos.y > container_pos[1] and self.picked_card.pos.y < container_pos[1] + $Container.rect_size[1]:
-		$Container.add_potential_card(self.picked_card)
+	var container_pos = $PlayersHand.rect_global_position
+	if self.picked_card.pos.x > container_pos[0] and self.picked_card.pos.x < container_pos[0] + $PlayersHand.rect_size[0] \
+			and self.picked_card.pos.y > container_pos[1] and self.picked_card.pos.y < container_pos[1] + $PlayersHand.rect_size[1]:
+		$PlayersHand.add_potential_card(self.picked_card)
 	
 	self.timer.paused = true  # pausing the timer so that there wouldn't be excessive calls to the player's hand
 
 func _process(delta):
-	var container_pos = $Container.rect_global_position
+	var container_pos = $PlayersHand.rect_global_position
 	if self.picked_card != null:
 		# checking if the card is in the hand container bounds and starting timer, after which picked card will be viewed as
 		# potential card for hand
-		if picked_card.pos.x > container_pos[0] and picked_card.pos.x < container_pos[0] + $Container.rect_size[0] \
-				and picked_card.pos.y > container_pos[1] and picked_card.pos.y < container_pos[1] + $Container.rect_size[1]:
+		if picked_card.pos.x > container_pos[0] and picked_card.pos.x < container_pos[0] + $PlayersHand.rect_size[0] \
+				and picked_card.pos.y > container_pos[1] and picked_card.pos.y < container_pos[1] + $PlayersHand.rect_size[1]:
 			if timer.is_stopped():
 				timer.wait_time = 1
 				timer.start()
@@ -128,4 +128,4 @@ func _process(delta):
 		self.timer.paused = false
 		self.timer.stop()
 		self.timer.disconnect("timeout", self, "inform_hand_about_potential_card")
-		$Container.remove_potential_card()
+		$PlayersHand.remove_potential_card()
