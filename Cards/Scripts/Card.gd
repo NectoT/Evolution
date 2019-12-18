@@ -1,5 +1,16 @@
 extends Area2D
 
+var conserved = false setget conserved_set  # aka static; disables all animations and ignores all input events
+
+func conserved_set(value):
+	conserved = value
+	self.enabled_highlight = false
+	self.enabled_pickup = false
+	
+	# in case it's used in the middle of any animations they should be canceled
+	self.remove_move_animation()
+	self.remove_angle_animation()
+
 var enabled_highlight_animation = false
 var enabled_highlight = true
 var enabled_pickup = true
@@ -10,59 +21,60 @@ var highlighted = false
 var id
 var manager
 
-var animation_start_point : Vector2
-var animation_end_point : Vector2
+var move_animation_start_point : Vector2
+var move_animation_end_point : Vector2
 
-var animation_offset : Vector2
-var required_animation_offset : Vector2
-var curr_animation_time : float
-export var animation_time : float = 1  # can't be zero, i didn't make a check for that so yeah
-var animation_speed : Vector2
-var animation_acceleration : Vector2
+var move_animation_offset : Vector2
+var required_move_animation_offset : Vector2
+var curr_move_animation_time : float
+export var move_animation_time : float = 1  # can't be zero, i didn't make a check for that so yeah
+var move_animation_speed : Vector2
+var move_animation_acceleration : Vector2
 
-func set_required_animation_offset(offset, time_reset=true):
+func set_required_move_animation_offset(offset, time_reset=true):
 	if time_reset:
-		self.curr_animation_time = 0
+		self.curr_move_animation_time = 0
 	
-	if self.curr_animation_time == self.animation_time:
+	if self.curr_move_animation_time == self.move_animation_time:
 		print("auto animation time reset")
-		self.curr_animation_time = 0
+		self.curr_move_animation_time = 0
 	
-	self.required_animation_offset = offset
+	self.required_move_animation_offset = offset
 	
-	self.animation_start_point = self.transform.origin
-	self.animation_end_point = self.pos + self.required_animation_offset
+	self.move_animation_start_point = self.transform.origin
+	self.move_animation_end_point = self.pos + self.required_move_animation_offset
 	
-	var animation_vector = self.animation_end_point - self.animation_start_point
+	var animation_vector = self.move_animation_end_point - self.move_animation_start_point
 	
-	var time = self.animation_time - self.curr_animation_time
-	self.animation_speed = 2 * animation_vector / time
-	self.animation_acceleration = -self.animation_speed / time
+	var time = self.move_animation_time - self.curr_move_animation_time
+	self.move_animation_speed = 2 * animation_vector / time
+	self.move_animation_acceleration = -self.move_animation_speed / time
 
-func add_required_animation_offset(offset, time_reset=true):
+func add_required_move_animation_offset(offset, time_reset=true):
 	if time_reset:
-		self.curr_animation_time = 0
-	self.set_required_animation_offset(self.required_animation_offset + offset)
+		self.curr_move_animation_time = 0
+	self.set_required_move_animation_offset(self.required_move_animation_offset + offset)
 
-func update_animation():
-	set_required_animation_offset(self.required_animation_offset)
+func update_move_animation():
+	set_required_move_animation_offset(self.required_move_animation_offset)
 
-func reset_animation():  # makes transform.origin the current position
-	self.animation_offset = Vector2(0, 0)
+func remove_move_animation():
+	self.transform.origin = self.pos
+	self.move_animation_offset = Vector2(0, 0)
 	self.highlight_required_offset = Vector2(0, 0)
-	self.set_required_animation_offset(Vector2(0, 0))
+	self.set_required_move_animation_offset(Vector2(0, 0))
 
 var highlight_required_offset : Vector2 setget highlight_required_offset_set
 
 func highlight_required_offset_set(value):
-	self.add_required_animation_offset(-self.highlight_required_offset)
+	self.add_required_move_animation_offset(-self.highlight_required_offset)
 	highlight_required_offset = value
-	self.add_required_animation_offset(self.highlight_required_offset)
+	self.add_required_move_animation_offset(self.highlight_required_offset)
 
 # in radians
 var angle_offset = 0
 var required_angle_offset = 0
-export var angle_animation_time : float = self.animation_time / 2
+export var angle_animation_time : float = self.move_animation_time / 2
 var curr_angle_animation_time : float
 var angle_speed
 var angle_acceleration
@@ -86,16 +98,20 @@ func set_required_angle_offset(offset, time_reset=true):
 	var difference = self.required_angle_offset - self.start_angle
 	var time = self.angle_animation_time - self.curr_angle_animation_time
 	self.angle_speed = 2 * difference / time
-	#print(self.angle_speed, rad2deg(offset))
-	print(self.id, " ", rad2deg(self.required_angle_offset), " ")
 	self.angle_acceleration = -self.angle_speed / time
 	
+	# needs to be rotated fully when setting offset for the hand layout "algorithm" to work
 	self.transform.x = Vector2(1, 0).rotated(offset)
 	self.transform.y = Vector2(0, 1).rotated(offset)
 
+func remove_angle_animation():
+	self.angle_offset = self.required_angle_offset
+	self.transform.x = Vector2(1, 0).rotated(self.required_angle_offset)
+	self.transform.y = Vector2(0, 1).rotated(self.required_angle_offset)
+
 func pos_set(value):
 	pos = value
-	self.update_animation()
+	self.update_move_animation()
 
 func pos_get():
 	return pos
@@ -103,8 +119,8 @@ func pos_get():
 func set_pos(new_pos, animation=true):
 	if not animation:
 		pos = new_pos
-		self.transform.origin = new_pos
-		self.reset_animation()
+		self.remove_move_animation()
+		self.remove_angle_animation()
 	else:
 		self.pos = new_pos
 
@@ -122,24 +138,27 @@ func _enter_tree():
 	
 	self.connect("pickup_request", manager, "_on_pickup_request")
 	self.connect("put_down_request", manager, "_on_put_down_request")
-#	self.connect("highlighted", manager, "_on_card_highlighted")
-#	self.connect("not_highlighted", manager, "_on_card_not_highlighted")
+	self.connect("highlighted", manager, "_on_card_highlighted")
+	self.connect("not_highlighted", manager, "_on_card_not_highlighted")
 
 func _ready():
 	size_changed()
-	self.set_required_animation_offset(Vector2(0, 0))
+	self.set_required_move_animation_offset(Vector2(0, 0))
 	
 #	self.connect("mouse_entered", self, "_on_mouse_entered")
 #	self.connect("mouse_exited", self, "_on_mouse_exited")
 
 func _unhandled_input(event):
+	if not self.visible:
+		return
+	
 	if event is InputEventMouseButton and event.button_index == 1 and enabled_pickup:
 		if mouse_inside:
 			self.highlight_control()
 			self.picked_up = !self.picked_up  # in this line works like a mousebuttonpressed variable
 			if manager != null and picked_up:
 				emit_signal("pickup_request", self.get_path(), event) 
-				print(self.picked_up)
+				print("Card picked up: ", self.picked_up)
 				if picked_up:
 					self.set_required_angle_offset(0)
 			elif manager != null and not picked_up:
@@ -197,8 +216,8 @@ func highlight_control():
 	self.highlighted = true if self.mouse_inside else false
 	if highlighted:
 		if self.enabled_highlight_animation:
-			var vertical_animation_offset = Vector2(0, -self.get_size()[1] / 2)
-			self.highlight_required_offset = vertical_animation_offset.rotated(self.transform.get_rotation())
+			var vertical_move_animation_offset = Vector2(0, -self.get_size()[1] / 2)
+			self.highlight_required_offset = vertical_move_animation_offset.rotated(self.transform.get_rotation())
 		$BordersSprite.show()
 		emit_signal("highlighted", self.get_path())
 	else:
@@ -208,12 +227,15 @@ func highlight_control():
 		emit_signal("not_highlighted", self.get_path())
 
 func _process(delta):
+	if self.conserved:
+		return
+	
 	# linear animation
-	self.transform.origin = self.animation_start_point - self.animation_offset
-	self.curr_animation_time = clamp(self.curr_animation_time + delta, 0, self.animation_time)
-	self.animation_offset = self.curr_animation_time * self.animation_speed + \
-			pow(self.curr_animation_time, 2) * self.animation_acceleration / 2
-	self.transform.origin = self.animation_start_point + self.animation_offset
+	self.transform.origin = self.move_animation_start_point - self.move_animation_offset
+	self.curr_move_animation_time = clamp(self.curr_move_animation_time + delta, 0, self.move_animation_time)
+	self.move_animation_offset = self.curr_move_animation_time * self.move_animation_speed + \
+			pow(self.curr_move_animation_time, 2) * self.move_animation_acceleration / 2
+	self.transform.origin = self.move_animation_start_point + self.move_animation_offset
 	
 	# angle animation
 	if self.required_angle_offset == self.angle_offset:
@@ -223,7 +245,6 @@ func _process(delta):
 			pow(self.curr_angle_animation_time, 2) * self.angle_acceleration / 2
 	self.transform.x = Vector2(1, 0).rotated(self.angle_offset)
 	self.transform.y = Vector2(0, 1).rotated(self.angle_offset)
-
 
 # wip
 func size_changed():
